@@ -229,9 +229,25 @@ class FrappeAPIClient {
   async getArticles() {
     try {
       console.log('🔍 Attempting to load HD Articles from API...');
-      
-      // Don't apply client-side filters in the API call - get all articles and filter in code
-      const result = await this.get(`/resource/HD Article`);
+
+      // Specify fields to fetch - Frappe defaults to only 'name' if not specified
+      const fields = [
+        'name',
+        'title',
+        'content',
+        'status',
+        'category',
+        'author',
+        'creation',
+        'modified',
+        'owner',
+        'views',
+        'is_public',
+        'helpful_count',
+        'not_helpful_count'
+      ];
+
+      const result = await this.get(`/resource/HD Article?fields=${JSON.stringify(fields)}`);
       console.log('✅ HD Articles loaded successfully:', result);
       return result;
     } catch (error: unknown) {
@@ -318,8 +334,26 @@ class FrappeAPIClient {
   }
 
   async searchArticles(query: string) {
+    // Specify fields to fetch - same as getArticles()
+    const fields = [
+      'name',
+      'title',
+      'content',
+      'status',
+      'category',
+      'author',
+      'creation',
+      'modified',
+      'owner',
+      'views',
+      'is_public',
+      'helpful_count',
+      'not_helpful_count'
+    ];
+
     return this.get('/resource/HD Article', {
       params: {
+        fields: JSON.stringify(fields),
         filters: JSON.stringify({
           title: ['like', `%${query}%`],
           status: 'Published'
