@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AuthStore, LoginCredentials, FrappeAuthResponse, FrappeUser } from '@/types/auth';
+import { AuthStore, LoginCredentials, FrappeUser } from '@/types/auth';
 import { apiClient } from '@/lib/api';
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -14,11 +14,11 @@ export const useAuthStore = create<AuthStore>()(
 
       login: async (credentials: LoginCredentials) => {
         set({ isLoading: true, error: null });
-        
+
         try {
           const response = await apiClient.login(credentials.usr, credentials.pwd);
-          const authData = response as any;
-          
+          const authData = response as { full_name?: string; first_name?: string; last_name?: string; message?: { full_name?: string; first_name?: string; last_name?: string } };
+
           // Create user object from login response
           const user: FrappeUser = {
             name: credentials.usr,
@@ -76,7 +76,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           // Call Frappe's getCurrentUser to check if session cookie is valid
           const response = await apiClient.getCurrentUser();
-          const userData = response as any;
+          const userData = response as { message?: string; email?: string };
 
           // getCurrentUser only returns the email, we need to fetch the full user details
           const userEmail = userData.message || userData.email;
@@ -88,7 +88,17 @@ export const useAuthStore = create<AuthStore>()(
           // Fetch the full user document to get name, roles, etc.
           try {
             const userDoc = await apiClient.get(`/resource/User/${userEmail}`);
-            const userDocData = userDoc as any;
+            const userDocData = userDoc as {
+              data?: {
+                name?: string;
+                full_name?: string;
+                first_name?: string;
+                last_name?: string;
+                roles?: Array<{ role: string }>;
+                enabled?: number;
+                user_type?: string;
+              }
+            };
 
             const user: FrappeUser = {
               name: userDocData.data?.name || userEmail,
@@ -96,7 +106,7 @@ export const useAuthStore = create<AuthStore>()(
               full_name: userDocData.data?.full_name || userDocData.data?.name || userEmail,
               first_name: userDocData.data?.first_name || '',
               last_name: userDocData.data?.last_name || '',
-              roles: userDocData.data?.roles?.map((r: any) => r.role) || [],
+              roles: userDocData.data?.roles?.map((r) => r.role) || [],
               enabled: userDocData.data?.enabled || 1,
               user_type: userDocData.data?.user_type || 'System User'
             };
@@ -133,7 +143,7 @@ export const useAuthStore = create<AuthStore>()(
 
             return true;
           }
-        } catch (error) {
+        } catch {
           // Session is invalid or expired, clear auth state
           console.log('No valid session found, user needs to login');
           set({

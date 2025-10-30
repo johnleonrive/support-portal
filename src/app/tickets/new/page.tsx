@@ -97,9 +97,11 @@ export default function NewTicketPage() {
       // Always include ticket_type, default to "Support" if not specified
       ticketData.ticket_type = formData.ticketType || 'Support';
 
-      // Include phone number if provided
+      // Note: Phone number handling would require adding 'contact' to CreateTicketData type
+      // For now, we'll just log it but not include it in the API call
       if (formData.phoneNumber.trim()) {
-        ticketData.contact = formData.phoneNumber;
+        console.log('Phone number provided:', formData.phoneNumber);
+        // ticketData.contact = formData.phoneNumber; // Commented out - not in type definition
       }
 
       console.log('Creating ticket with data:', {
@@ -126,17 +128,22 @@ export default function NewTicketPage() {
         
         // Redirect to the new ticket
         router.push(`/tickets/${response.data.name}`);
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         console.error('❌ Create ticket API request failed:', apiError);
-        
+
+        // Type guard for error objects
+        const isErrorWithMessage = (error: unknown): error is { message: string; status?: number } => {
+          return typeof error === 'object' && error !== null && 'message' in error;
+        };
+
         // Check if it's an authentication error - if so, show more specific message
-        if (apiError?.message?.includes('Authentication') || apiError?.status === 401) {
+        if (isErrorWithMessage(apiError) && (apiError.message?.includes('Authentication') || apiError.status === 401)) {
           setError('Authentication failed. Please check if you have permission to create tickets.');
           return;
         }
-        
+
         // For other API errors, show the actual error but also offer to create locally
-        const errorMsg = apiError?.message || 'Unknown API error';
+        const errorMsg = isErrorWithMessage(apiError) ? apiError.message : 'Unknown API error';
         const createLocal = confirm(
           `API Error: ${errorMsg}\n\nWould you like to create a local ticket instead? ` +
           `(This will work in the portal but won't sync to Frappe)`

@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
-import { apiClient } from '@/lib/api';
 
 interface AuthProviderProps {
   children: React.ReactNode;

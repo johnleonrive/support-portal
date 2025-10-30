@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -192,6 +192,30 @@ export default function KnowledgeBasePage() {
     loadArticles();
   }, []);
 
+  const getUniqueCategories = useCallback(() => {
+    const categories = articles
+      .map(article => article.category)
+      .filter(Boolean)
+      .filter((category, index, self) => self.indexOf(category) === index);
+    return categories as string[];
+  }, [articles]);
+
+  const performAPISearch = useCallback(async () => {
+    if (!searchQuery.trim()) return;
+
+    try {
+      setIsLoading(true);
+      const response = await apiClient.searchArticles(searchQuery) as FrappeResponse<HDArticle>;
+      const searchResults = response.data || [];
+      setFilteredArticles(searchResults);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Search failed';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery]);
+
   // Debounced search effect (like tickets page)
   useEffect(() => {
     const searchTimeout = setTimeout(() => {
@@ -222,23 +246,7 @@ export default function KnowledgeBasePage() {
     }, 300); // 300ms debounce
 
     return () => clearTimeout(searchTimeout);
-  }, [searchQuery, articles]);
-
-  const performAPISearch = async () => {
-    if (!searchQuery.trim()) return;
-    
-    try {
-      setIsLoading(true);
-      const response = await apiClient.searchArticles(searchQuery) as FrappeResponse<HDArticle>;
-      const searchResults = response.data || [];
-      setFilteredArticles(searchResults);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Search failed';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [searchQuery, articles, getUniqueCategories, performAPISearch]);
 
   const truncateContent = (content: string | undefined, maxLength: number = 200) => {
     if (!content) return 'No content available';
@@ -267,14 +275,6 @@ export default function KnowledgeBasePage() {
     return textContent.length > maxLength 
       ? textContent.substring(0, maxLength) + '...'
       : textContent;
-  };
-
-  const getUniqueCategories = () => {
-    const categories = articles
-      .map(article => article.category)
-      .filter(Boolean)
-      .filter((category, index, self) => self.indexOf(category) === index);
-    return categories as string[];
   };
 
   const handleLogout = async () => {

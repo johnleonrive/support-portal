@@ -226,7 +226,7 @@ class FrappeAPIClient {
   }
 
   // Knowledge Base Articles
-  async getArticles(filters?: Record<string, unknown>) {
+  async getArticles() {
     try {
       console.log('🔍 Attempting to load HD Articles from API...');
       
@@ -234,10 +234,14 @@ class FrappeAPIClient {
       const result = await this.get(`/resource/HD Article`);
       console.log('✅ HD Articles loaded successfully:', result);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ HD Article API error:', error);
+      // Type guard for axios errors
+      const isAxiosError = (err: unknown): err is { response?: { status: number }; status?: number; skipErrorHandling?: boolean } => {
+        return typeof err === 'object' && err !== null;
+      };
       // If HD Article doctype doesn't exist (417), return empty data instead of throwing
-      if (error?.response?.status === 417 || error?.status === 417 || error?.skipErrorHandling) {
+      if (isAxiosError(error) && (error?.response?.status === 417 || error?.status === 417 || error?.skipErrorHandling)) {
         console.log('⚠️ HD Article doctype not available, returning empty data');
         return { data: [] };
       }
@@ -265,13 +269,16 @@ class FrappeAPIClient {
           await this.get(`${test.url}?limit_page_length=1`);
           results.push({ doctype: test.name, available: true });
           console.log(`✅ ${test.name}: Available`);
-        } catch (error: any) {
-          const status = error?.response?.status || error?.status;
-          results.push({ 
-            doctype: test.name, 
-            available: false, 
-            status, 
-            error: error?.message 
+        } catch (error: unknown) {
+          const isErrorObj = (err: unknown): err is { response?: { status: number }; status?: number; message?: string } => {
+            return typeof err === 'object' && err !== null;
+          };
+          const status = isErrorObj(error) ? (error?.response?.status || error?.status) : undefined;
+          results.push({
+            doctype: test.name,
+            available: false,
+            status,
+            error: isErrorObj(error) ? error?.message : 'Unknown error' 
           });
           console.log(`❌ ${test.name}: Not available (${status})`);
         }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -8,20 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, 
-  Calendar,
+import {
+  ArrowLeft,
   User,
-  Clock,
   AlertCircle,
   CheckCircle,
   XCircle,
-  MessageSquare,
-  Edit
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
-import { HDTicket, HDCommunication, FrappeResponse, TICKET_STATUS_CONFIG } from '@/types/frappe';
+import { HDTicket, HDCommunication } from '@/types/frappe';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 export default function TicketDetailsPage() {
@@ -94,7 +91,7 @@ export default function TicketDetailsPage() {
               name: 'TKT-2024-002', 
               subject: 'Feature Request: Dark Mode',
               description: 'It would be great to have a dark mode option for better user experience.\n\nDetails:\n- Dark theme for main interface\n- Toggle switch in user preferences\n- Remember preference across sessions\n- Apply to all pages including login\n\nThis would help reduce eye strain during extended use, especially in low-light environments.',
-              status: 'In Progress',
+              status: 'Replied',
               priority: 'Medium',
               raised_by: user.email,
               creation: new Date(Date.now() - 86400000).toISOString(),
@@ -138,7 +135,7 @@ export default function TicketDetailsPage() {
   }, [user, ticketId]);
 
   // Load ticket replies
-  const loadReplies = async () => {
+  const loadReplies = useCallback(async () => {
     if (!ticketId) return;
 
     try {
@@ -190,14 +187,14 @@ export default function TicketDetailsPage() {
     } finally {
       setIsLoadingReplies(false);
     }
-  };
+  }, [ticketId, user]);
 
   // Load replies when ticket is loaded
   useEffect(() => {
     if (ticket) {
       loadReplies();
     }
-  }, [ticket]);
+  }, [ticket, loadReplies]);
 
   // Submit new reply
   const handleSubmitReply = async (e: React.FormEvent) => {
@@ -262,17 +259,6 @@ export default function TicketDetailsPage() {
       default:
         return <AlertCircle className="h-4 w-4" />;
     }
-  };
-
-  const getStatusBadgeVariant = (status: HDTicket['status']) => {
-    const config = TICKET_STATUS_CONFIG[status];
-    return config?.color === 'blue' ? 'default' : 
-           config?.color === 'yellow' ? 'secondary' :
-           config?.color === 'green' ? 'default' : 'outline';
-  };
-
-  const stripHtmlTags = (html: string) => {
-    return html.replace(/<[^>]*>/g, '').trim();
   };
 
   // Show loading while hydrating

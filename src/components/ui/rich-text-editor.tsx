@@ -84,16 +84,6 @@ export function RichTextEditor({
     },
   });
 
-  const addImage = useCallback(() => {
-    if (!editor) return;
-
-    const url = window.prompt('Enter image URL:');
-
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
-    }
-  }, [editor]);
-
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editor) return;
 

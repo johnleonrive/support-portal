@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
-import { HDTicket, FrappeResponse, TICKET_STATUS_CONFIG } from '@/types/frappe';
+import { HDTicket, FrappeResponse } from '@/types/frappe';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function DashboardPage() {
@@ -87,20 +86,24 @@ export default function DashboardPage() {
               raised_by: user.email,
               creation: new Date().toISOString(),
               modified: new Date().toISOString(),
+              modified_by: user.email,
               owner: user.email,
-              ticket_type: 'Technical Support'
+              ticket_type: 'Technical Support',
+              docstatus: 0
             },
             {
-              name: 'TKT-2024-002', 
+              name: 'TKT-2024-002',
               subject: 'Feature Request: Dark Mode',
               description: 'It would be great to have a dark mode option for better user experience.',
-              status: 'In Progress',
+              status: 'Replied',
               priority: 'Medium',
               raised_by: user.email,
               creation: new Date(Date.now() - 86400000).toISOString(), // Yesterday
               modified: new Date().toISOString(),
+              modified_by: user.email,
               owner: user.email,
-              ticket_type: 'Feature Request'
+              ticket_type: 'Feature Request',
+              docstatus: 0
             },
             {
               name: 'TKT-2024-003',
@@ -111,8 +114,10 @@ export default function DashboardPage() {
               raised_by: user.email,
               creation: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
               modified: new Date().toISOString(),
+              modified_by: user.email,
               owner: user.email,
-              ticket_type: 'General Inquiry'
+              ticket_type: 'General Inquiry',
+              docstatus: 0
             }
           ];
           
@@ -140,32 +145,7 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  // Debounced search effect
-  useEffect(() => {
-    const searchTimeout = setTimeout(() => {
-      if (!searchQuery.trim()) {
-        // If search is empty, show all tickets
-        setTickets(allTickets);
-      } else {
-        // Filter tickets locally first for instant feedback
-        const filteredTickets = allTickets.filter(ticket => 
-          ticket.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ticket.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        
-        if (filteredTickets.length > 0) {
-          setTickets(filteredTickets);
-        } else {
-          // If no local results, try API search
-          performAPISearch();
-        }
-      }
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(searchTimeout);
-  }, [searchQuery, allTickets]);
-
-  const performAPISearch = async () => {
+  const performAPISearch = useCallback(async () => {
     if (!searchQuery.trim() || !user) return;
     
     try {
@@ -180,7 +160,32 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchQuery, user]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const searchTimeout = setTimeout(() => {
+      if (!searchQuery.trim()) {
+        // If search is empty, show all tickets
+        setTickets(allTickets);
+      } else {
+        // Filter tickets locally first for instant feedback
+        const filteredTickets = allTickets.filter(ticket =>
+          ticket.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ticket.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        if (filteredTickets.length > 0) {
+          setTickets(filteredTickets);
+        } else {
+          // If no local results, try API search
+          performAPISearch();
+        }
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(searchTimeout);
+  }, [searchQuery, allTickets, performAPISearch]);
 
   const handleLogout = async () => {
     await logout();

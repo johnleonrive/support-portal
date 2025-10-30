@@ -7,9 +7,9 @@ export interface FrappeDoc {
   name: string;
   creation: string;
   modified: string;
-  modified_by: string;
+  modified_by?: string;
   owner: string;
-  docstatus: number;
+  docstatus?: number;
 }
 
 // HD Ticket types
@@ -65,7 +65,7 @@ export interface HDArticle extends FrappeDoc {
   title: string;
   content: string;
   category?: string;
-  author: string;
+  author?: string;
   status: 'Draft' | 'Published' | 'Archived';
   is_public?: boolean;
   helpful_count?: number;
