@@ -231,6 +231,7 @@ class FrappeAPIClient {
       console.log('🔍 Attempting to load HD Articles from API...');
 
       // Specify fields to fetch - Frappe defaults to only 'name' if not specified
+      // Note: Some fields like 'is_public', 'helpful_count' are not permitted in HD Article queries
       const fields = [
         'name',
         'title',
@@ -240,11 +241,7 @@ class FrappeAPIClient {
         'author',
         'creation',
         'modified',
-        'owner',
-        'views',
-        'is_public',
-        'helpful_count',
-        'not_helpful_count'
+        'owner'
       ];
 
       const result = await this.get(`/resource/HD Article?fields=${JSON.stringify(fields)}`);
@@ -335,6 +332,7 @@ class FrappeAPIClient {
 
   async searchArticles(query: string) {
     // Specify fields to fetch - same as getArticles()
+    // Note: Some fields like 'is_public', 'helpful_count' are not permitted in HD Article queries
     const fields = [
       'name',
       'title',
@@ -344,11 +342,7 @@ class FrappeAPIClient {
       'author',
       'creation',
       'modified',
-      'owner',
-      'views',
-      'is_public',
-      'helpful_count',
-      'not_helpful_count'
+      'owner'
     ];
 
     return this.get('/resource/HD Article', {
