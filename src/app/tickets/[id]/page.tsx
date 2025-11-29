@@ -21,6 +21,27 @@ import { apiClient } from '@/lib/api';
 import { HDTicket, HDCommunication } from '@/types/frappe';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
+// Transform relative Frappe URLs to use our proxy for private files
+// Frappe stores images with paths like /private/files/... or /files/...
+// Private files require authentication, so we proxy them through our API
+const transformFrappeUrls = (html: string): string => {
+  if (!html) return html;
+
+  // Replace private file URLs with our proxy route
+  // /private/files/... -> /private/files/... (our Next.js route will handle it)
+  // Also handle public /files/... by prefixing with Frappe base URL
+  const frappeBaseUrl = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL || '';
+
+  return html
+    // Keep private files going through our proxy (handled by /private/files/[[...path]] route)
+    // No change needed as these already point to /private/files/...
+    // But ensure public files get the Frappe base URL
+    .replace(
+      /src="(\/files\/[^"]+)"/g,
+      `src="${frappeBaseUrl}$1"`
+    );
+};
+
 export default function TicketDetailsPage() {
   const params = useParams();
   const ticketId = params?.id as string;
@@ -52,13 +73,17 @@ export default function TicketDetailsPage() {
         // Try to load real data first, fallback to mock data if API fails
         try {
           const response = await apiClient.getTicket(ticketId) as { data: HDTicket };
-          
+
           // Check if user has permission to view this ticket
-          if (response.data.raised_by !== user.email) {
+          // User can view if: they raised it, OR they're in the same clinic
+          const canView = response.data.raised_by === user.email ||
+            (user.clinic && response.data.clinic === user.clinic);
+
+          if (!canView) {
             setError('You do not have permission to view this ticket');
             return;
           }
-          
+
           setTicket(response.data);
         } catch (apiError) {
           console.warn('Ticket detail API request failed, checking localStorage and mock data:', apiError);
@@ -136,54 +161,34 @@ export default function TicketDetailsPage() {
 
   // Load ticket replies
   const loadReplies = useCallback(async () => {
-    if (!ticketId) return;
+    if (!ticketId || !user) return;
 
     try {
       setIsLoadingReplies(true);
 
-      // Use mock data for now due to permissions issues with HD Ticket Comment
-      // TODO: Fix permissions for customer users to read HD Ticket Comment
-      console.log('📋 Loading mock replies for demo purposes');
+      // Use skipImpersonation to fetch ALL comments for this ticket
+      // This allows clinic users to see comments from all parties
+      const skipImpersonation = !!user.clinic;
 
-      const mockReplies: HDCommunication[] = [
-        {
-          name: 'COMM-001',
-          content: '<p>Thank you for reporting this issue. We are currently investigating the authentication problems and will update you shortly.</p>',
-          sender: 'support@smyls.ca',
-          sender_full_name: 'SMYLS Support Team',
-          creation: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-          modified: new Date(Date.now() - 3600000).toISOString(),
-          owner: 'support@smyls.ca',
-          docstatus: 0,
-          communication_type: 'Comment',
-          sent_or_received: 'Received',
-          reference_doctype: 'HD Ticket',
-          reference_name: ticketId,
-          modified_by: 'support@smyls.ca',
-          commented_by: 'support@smyls.ca',
-          reference_ticket: ticketId
-        },
-        {
-          name: 'COMM-002',
-          content: '<p>Hi, thank you for the quick response. I tried the suggested steps but I\'m still having the same issue. Could you please provide additional guidance?</p>',
-          sender: user?.email || 'user@example.com',
-          sender_full_name: user?.full_name || 'User',
-          creation: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
-          modified: new Date(Date.now() - 1800000).toISOString(),
-          owner: user?.email || 'user@example.com',
-          docstatus: 0,
-          communication_type: 'Comment',
-          sent_or_received: 'Sent',
-          reference_doctype: 'HD Ticket',
-          reference_name: ticketId,
-          modified_by: user?.email || 'user@example.com',
-          commented_by: user?.email || 'user@example.com',
-          reference_ticket: ticketId
-        }
-      ];
-      setReplies(mockReplies);
+      console.log('📋 Loading replies from API with skipImpersonation:', skipImpersonation);
+
+      const response = await apiClient.getTicketReplies(ticketId, skipImpersonation) as { data: HDCommunication[] };
+
+      console.log('📋 Replies loaded:', response.data?.length || 0);
+
+      // Map the HD Ticket Comment fields to our HDCommunication type
+      const mappedReplies: HDCommunication[] = (response.data || []).map(comment => ({
+        ...comment,
+        sender: comment.commented_by || comment.owner,
+        sender_full_name: comment.commented_by || comment.owner,
+        reference_ticket: ticketId
+      }));
+
+      setReplies(mappedReplies);
     } catch (error: unknown) {
       console.error('Failed to load replies:', error);
+      // Don't set error state - just show empty conversation
+      setReplies([]);
     } finally {
       setIsLoadingReplies(false);
     }
@@ -212,33 +217,19 @@ export default function TicketDetailsPage() {
     try {
       setIsSubmittingReply(true);
 
-      // Add reply locally (demo mode - permissions need to be fixed for API)
-      console.log('📤 Adding reply locally (demo mode)');
+      console.log('📤 Submitting reply to API...');
 
-      const mockReplyData: HDCommunication = {
-        name: `COMM-MOCK-${Date.now()}`,
-        content: newReply,
-        sender: user.email,
-        sender_full_name: user.full_name || user.email,
-        creation: new Date().toISOString(),
-        modified: new Date().toISOString(),
-        owner: user.email,
-        docstatus: 0,
-        communication_type: 'Comment',
-        sent_or_received: 'Sent',
-        reference_doctype: 'HD Ticket',
-        reference_name: ticketId,
-        modified_by: user.email,
-        commented_by: user.email,
-        reference_ticket: ticketId
-      };
+      // Post to Frappe API - keep user impersonation so the comment is attributed correctly
+      await apiClient.addTicketReply(ticketId, newReply, user.email);
 
-      setReplies(prevReplies => [...prevReplies, mockReplyData]);
+      console.log('✅ Reply submitted successfully');
+
+      // Clear the input and reload replies
       setNewReply('');
-
-      console.log('✅ Reply added successfully (local only)');
+      await loadReplies();
 
     } catch (error: unknown) {
+      console.error('Failed to submit reply:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send reply. Please try again.';
       setError(errorMessage);
     } finally {
@@ -392,7 +383,7 @@ export default function TicketDetailsPage() {
               <CardContent>
                 <div
                   className="prose max-w-none prose-gray"
-                  dangerouslySetInnerHTML={{ __html: ticket.description }}
+                  dangerouslySetInnerHTML={{ __html: transformFrappeUrls(ticket.description) }}
                 />
               </CardContent>
             </Card>
@@ -409,7 +400,7 @@ export default function TicketDetailsPage() {
                 <CardContent>
                   <div
                     className="prose max-w-none prose-gray"
-                    dangerouslySetInnerHTML={{ __html: ticket.resolution }}
+                    dangerouslySetInnerHTML={{ __html: transformFrappeUrls(ticket.resolution) }}
                   />
                   {ticket.resolution_date && (
                     <div className="mt-4 text-sm text-gray-600">
@@ -457,28 +448,38 @@ export default function TicketDetailsPage() {
                           {replies
                             .sort((a, b) => new Date(a.creation).getTime() - new Date(b.creation).getTime())
                             .map((reply) => {
-                              // Check if this message is from the current user (customer)
+                              // Check if this message is from the current user
                               const isFromCurrentUser = reply.sender === user?.email;
-                              
+                              // Check if from admin/support (Administrator or non-clinic users)
+                              const isFromAdmin = reply.sender === 'Administrator' ||
+                                reply.sender?.includes('admin') ||
+                                (!reply.sender?.includes('@example.com') && !isFromCurrentUser);
+
+                              // Determine background color
+                              // Admin: Medical Blue (#00AEEF)
+                              // Clinic member: Medical Green (#2ABDAD)
+                              // Current user: Gray
+                              const getBackgroundStyle = () => {
+                                if (isFromCurrentUser) return {};
+                                if (isFromAdmin) return { background: '#00AEEF', borderColor: '#00AEEF', color: 'white' };
+                                return { background: '#2ABDAD', borderColor: '#2ABDAD', color: 'white' };
+                              };
+
                               return (
                                 <div
                                   key={reply.name}
                                   className={`p-4 rounded-lg border ${
-                                    isFromCurrentUser 
-                                      ? 'bg-gray-50 border-gray-200 ml-8' // Customer messages: right-aligned and gray
-                                      : 'mr-8' // Admin/agent messages: left-aligned with gradient
+                                    isFromCurrentUser
+                                      ? 'bg-gray-50 border-gray-200 ml-8' // Current user: right-aligned and gray
+                                      : 'mr-8' // Others: left-aligned with color
                                   }`}
-                                  style={!isFromCurrentUser ? {
-                                    background: 'linear-gradient(135deg, #00AEEF 0%, #2ABDAD 100%)',
-                                    borderColor: '#00AEEF',
-                                    color: 'white'
-                                  } : {}}
+                                  style={getBackgroundStyle()}
                                 >
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center space-x-2">
                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                                        isFromCurrentUser 
-                                          ? 'bg-gray-600' 
+                                        isFromCurrentUser
+                                          ? 'bg-gray-600'
                                           : 'bg-white bg-opacity-20'
                                       }`}>
                                         {(reply.sender_full_name || reply.sender)?.charAt(0)?.toUpperCase() || 'U'}
@@ -501,7 +502,7 @@ export default function TicketDetailsPage() {
                                     className={`prose max-w-none ${
                                       isFromCurrentUser ? 'prose-gray' : 'prose-invert'
                                     }`}
-                                    dangerouslySetInnerHTML={{ __html: reply.content }}
+                                    dangerouslySetInnerHTML={{ __html: transformFrappeUrls(reply.content) }}
                                   />
                                 </div>
                               );

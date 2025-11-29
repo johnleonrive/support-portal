@@ -43,31 +43,8 @@ export default function KnowledgeBasePage() {
     const loadArticles = async () => {
       try {
         setIsLoading(true);
-        
-        // First, test what doctypes are available
-        console.log('🔍 Testing available doctypes in Frappe system...');
-        try {
-          const doctypeResults = await apiClient.getAvailableDoctypes();
-          console.log('📋 Available doctypes:', doctypeResults);
-          
-          // Check if HD Article is available
-          const hdArticleAvailable = doctypeResults.find(result => result.doctype === 'HD Article')?.available;
-          if (!hdArticleAvailable) {
-            console.log('⚠️ HD Article doctype not available in this Frappe instance');
-            // Try alternative doctypes
-            const alternatives = doctypeResults.filter(result => 
-              result.available && 
-              (result.doctype.includes('Article') || result.doctype.includes('Knowledge'))
-            );
-            if (alternatives.length > 0) {
-              console.log('📝 Available alternatives:', alternatives.map(a => a.doctype));
-            }
-          }
-        } catch (error) {
-          console.warn('Could not test doctypes:', error);
-        }
-        
-        // Try to load real articles from Frappe API
+
+        // Load articles from Frappe API
         try {
           console.log('🔍 Loading articles from Frappe API...');
           const response = await apiClient.getArticles() as FrappeResponse<HDArticle>;

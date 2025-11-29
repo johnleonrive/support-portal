@@ -32,6 +32,7 @@ export interface HDTicket extends FrappeDoc {
   feedback_text?: string;
   template?: string;
   custom_fields?: Record<string, unknown>;
+  clinic?: string; // Custom field: Link to Company
 }
 
 export interface CreateTicketData {
@@ -40,6 +41,7 @@ export interface CreateTicketData {
   priority?: 'Low' | 'Medium' | 'High' | 'Critical';
   ticket_type?: string;
   raised_by?: string;
+  clinic?: string; // Custom field: Link to Company
 }
 
 // HD Ticket Comment types (used for ticket conversations in Frappe Helpdesk)

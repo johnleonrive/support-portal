@@ -27,11 +27,17 @@ export async function GET(
       'Accept': 'application/json',
     };
 
+    // Check if we should skip user impersonation (for admin-level queries like clinic-based filtering)
+    const skipImpersonation = request.headers.get('x-skip-impersonation') === 'true';
+
     // Forward cookies from client to Frappe for session-based auth
+    // BUT NOT when skipping impersonation - session cookies would override admin token permissions
     const cookieHeader = request.headers.get('cookie');
-    if (cookieHeader) {
+    if (cookieHeader && !skipImpersonation) {
       headers['Cookie'] = cookieHeader;
       console.log(`[API Proxy] Forwarding cookies to Frappe`);
+    } else if (skipImpersonation) {
+      console.log(`[API Proxy] NOT forwarding cookies - using pure admin token auth`);
     }
 
     // Use admin tokens for reliable API access, with user-scoped filtering
@@ -39,10 +45,13 @@ export async function GET(
       headers['Authorization'] = `token ${API_KEY}:${API_SECRET}`;
 
       // Check for user impersonation header to ensure correct attribution
+      // Skip impersonation for ticket listing to allow clinic-based filtering across users
       const userEmail = request.headers.get('x-user-email');
-      if (userEmail) {
+      if (userEmail && !skipImpersonation) {
         headers['X-Frappe-User'] = userEmail;
         console.log(`[API Proxy] Impersonating user: ${userEmail}`);
+      } else if (skipImpersonation) {
+        console.log(`[API Proxy] Skipping user impersonation - using admin credentials only`);
       }
     }
 

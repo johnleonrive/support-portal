@@ -13,6 +13,7 @@ export interface FrappeUser {
   roles: string[];
   enabled?: number;
   user_type?: string;
+  clinic?: string; // Custom field: Link to Company
 }
 
 export interface FrappeAuthResponse {

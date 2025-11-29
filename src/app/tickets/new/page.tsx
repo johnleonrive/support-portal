@@ -97,6 +97,11 @@ export default function NewTicketPage() {
       // Always include ticket_type, default to "Support" if not specified
       ticketData.ticket_type = formData.ticketType || 'Support';
 
+      // Auto-populate clinic from the user's clinic
+      if (user?.clinic) {
+        ticketData.clinic = user.clinic;
+      }
+
       // Note: Phone number handling would require adding 'contact' to CreateTicketData type
       // For now, we'll just log it but not include it in the API call
       if (formData.phoneNumber.trim()) {
@@ -166,6 +171,7 @@ export default function NewTicketPage() {
           ticket_type: ticketData.ticket_type,
           raised_by: formData.contactEmail || user?.email || '',
           contact: formData.phoneNumber || undefined,
+          clinic: user?.clinic, // Include clinic for local tickets too
           creation: new Date().toISOString(),
           modified: new Date().toISOString(),
           owner: user?.email || '',
@@ -314,16 +320,16 @@ export default function NewTicketPage() {
               {/* Form Actions */}
               <div className="flex justify-between pt-6">
                 <Link href="/dashboard">
-                  <Button type="button" variant="outline" disabled={isLoading}>
+                  <Button type="button" variant="outline" disabled={isLoading} className="cursor-pointer">
                     Cancel
                   </Button>
                 </Link>
-                
-                <Button 
-                  type="submit" 
+
+                <Button
+                  type="submit"
                   disabled={isLoading}
-                  className="text-white"
-                  style={{ 
+                  className="text-white cursor-pointer"
+                  style={{
                     background: 'linear-gradient(90deg, #00AEEF 0%, #2ABDAD 100%)',
                     border: 'none',
                     fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'

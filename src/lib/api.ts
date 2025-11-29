@@ -160,6 +160,69 @@ class FrappeAPIClient {
     return this.get('/method/frappe.auth.get_logged_user');
   }
 
+  // Get user details including custom fields (bypasses REST API caching)
+  async getUserDetails(email: string) {
+    return this.post('/method/frappe.client.get_value', {
+      doctype: 'User',
+      filters: { name: email },
+      fieldname: ['name', 'full_name', 'first_name', 'last_name', 'email', 'enabled', 'user_type', 'clinic']
+    });
+  }
+
+  // Get Contact document by user email (to find linked Company)
+  async getContactByUser(userEmail: string) {
+    try {
+      // Search for Contact where user field matches the email
+      const response = await this.get<{ data: Array<{ name: string }> }>('/resource/Contact', {
+        params: {
+          filters: JSON.stringify({ user: userEmail }),
+          fields: JSON.stringify(['name']),
+          limit_page_length: 1
+        }
+      });
+
+      if (response.data && response.data.length > 0) {
+        // Get the full Contact document with links
+        const contactName = response.data[0].name;
+        return this.get(`/resource/Contact/${encodeURIComponent(contactName)}`);
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('Could not fetch Contact for user:', userEmail, error);
+      return null;
+    }
+  }
+
+  // Get Company from Contact's links
+  async getCompanyFromContact(userEmail: string): Promise<string | undefined> {
+    try {
+      const contactResponse = await this.getContactByUser(userEmail);
+
+      if (!contactResponse) {
+        console.log('No Contact found for user:', userEmail);
+        return undefined;
+      }
+
+      const contactData = contactResponse as { data?: { links?: Array<{ link_doctype: string; link_name: string }> } };
+      const links = contactData.data?.links || [];
+
+      // Find the Company link in the links array
+      const companyLink = links.find(link => link.link_doctype === 'Company');
+
+      if (companyLink) {
+        console.log('Found Company from Contact links:', companyLink.link_name);
+        return companyLink.link_name;
+      }
+
+      console.log('No Company link found in Contact:', contactData.data);
+      return undefined;
+    } catch (error) {
+      console.warn('Error getting Company from Contact:', error);
+      return undefined;
+    }
+  }
+
   // Frappe-specific methods for support portal
   
   // User signup
@@ -177,17 +240,26 @@ class FrappeAPIClient {
   }
 
   // Tickets
-  async getTickets(filters?: Record<string, unknown>) {
+  // When fetching tickets for clinic-based filtering, we need to skip user impersonation
+  // to get ALL tickets (admin-level access) and then filter client-side by clinic
+  async getTickets(filters?: Record<string, unknown>, skipImpersonation = false) {
     const params: Record<string, string> = {};
     if (filters) {
       params.filters = JSON.stringify(filters);
     }
-    // Request specific fields for the list view
+    // Request specific fields for the list view (including clinic for filtering)
     params.fields = JSON.stringify([
-      'name', 'subject', 'description', 'status', 'priority', 
-      'raised_by', 'creation', 'modified', 'owner', 'ticket_type'
+      'name', 'subject', 'description', 'status', 'priority',
+      'raised_by', 'creation', 'modified', 'owner', 'ticket_type', 'clinic'
     ]);
-    return this.get(`/resource/HD Ticket`, { params });
+
+    // Create headers with optional skip impersonation
+    const headers: Record<string, string> = {};
+    if (skipImpersonation) {
+      headers['X-Skip-Impersonation'] = 'true';
+    }
+
+    return this.get(`/resource/HD Ticket`, { params, headers });
   }
 
   async getTicket(ticketId: string) {
@@ -203,7 +275,8 @@ class FrappeAPIClient {
   }
 
   // Ticket Replies/Comments (using HD Ticket Comment doctype from Frappe Helpdesk)
-  async getTicketReplies(ticketId: string) {
+  // skipImpersonation allows clinic users to see all comments on shared tickets
+  async getTicketReplies(ticketId: string, skipImpersonation = false) {
     const params = {
       filters: JSON.stringify({
         reference_ticket: ticketId
@@ -214,7 +287,13 @@ class FrappeAPIClient {
       ]),
       order_by: 'creation asc'
     };
-    return this.get(`/resource/HD Ticket Comment`, { params });
+
+    const headers: Record<string, string> = {};
+    if (skipImpersonation) {
+      headers['X-Skip-Impersonation'] = 'true';
+    }
+
+    return this.get(`/resource/HD Ticket Comment`, { params, headers });
   }
 
   async addTicketReply(ticketId: string, content: string, sender?: string) {
@@ -262,71 +341,36 @@ class FrappeAPIClient {
     }
   }
 
-  // Helper method to test what doctypes are available
-  async getAvailableDoctypes() {
-    try {
-      console.log('🔍 Testing available doctypes...');
-      
-      // Try some common Frappe doctypes to see what's available
-      const tests = [
-        { name: 'HD Ticket', url: '/resource/HD Ticket' },
-        { name: 'HD Article', url: '/resource/HD Article' },
-        { name: 'Knowledge Base Article', url: '/resource/Knowledge Base Article' },
-        { name: 'Article', url: '/resource/Article' },
-        { name: 'Help Article', url: '/resource/Help Article' }
-      ];
-      
-      const results = [];
-      for (const test of tests) {
-        try {
-          await this.get(`${test.url}?limit_page_length=1`);
-          results.push({ doctype: test.name, available: true });
-          console.log(`✅ ${test.name}: Available`);
-        } catch (error: unknown) {
-          const isErrorObj = (err: unknown): err is { response?: { status: number }; status?: number; message?: string } => {
-            return typeof err === 'object' && err !== null;
-          };
-          const status = isErrorObj(error) ? (error?.response?.status || error?.status) : undefined;
-          results.push({
-            doctype: test.name,
-            available: false,
-            status,
-            error: isErrorObj(error) ? error?.message : 'Unknown error' 
-          });
-          console.log(`❌ ${test.name}: Not available (${status})`);
-        }
-      }
-      
-      return results;
-    } catch (error) {
-      console.error('Error testing doctypes:', error);
-      return [];
-    }
-  }
-
   async getArticle(articleId: string) {
     return this.get(`/resource/HD Article/${articleId}`);
   }
 
   // Search
-  async searchTickets(query: string, userEmail?: string) {
+  async searchTickets(query: string, clinic?: string, skipImpersonation = false) {
     const filters: Record<string, unknown> = {
       subject: ['like', `%${query}%`]
     };
-    
-    // Filter by user if provided
-    if (userEmail) {
-      filters.raised_by = userEmail;
+
+    // Filter by clinic if provided (shows all tickets from the same clinic)
+    if (clinic) {
+      filters.clinic = clinic;
     }
-    
+
+    // Create headers with optional skip impersonation
+    const headers: Record<string, string> = {};
+    if (skipImpersonation) {
+      headers['X-Skip-Impersonation'] = 'true';
+    }
+
     return this.get('/resource/HD Ticket', {
       params: {
         filters: JSON.stringify(filters),
         fields: JSON.stringify([
-          'name', 'subject', 'description', 'status', 'priority', 
-          'raised_by', 'creation', 'modified', 'owner', 'ticket_type'
+          'name', 'subject', 'description', 'status', 'priority',
+          'raised_by', 'creation', 'modified', 'owner', 'ticket_type', 'clinic'
         ])
-      }
+      },
+      headers
     });
   }
 

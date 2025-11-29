@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
+import ImageResize from 'tiptap-extension-resize-image';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
@@ -49,13 +49,16 @@ export function RichTextEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
+      // StarterKit includes: Document, Paragraph, Text, Blockquote, BulletList, CodeBlock,
+      // HardBreak, Heading, HorizontalRule, ListItem, OrderedList, Bold, Code, Italic, Strike
+      // Disable features we're adding separately to avoid duplicate extension warnings
       StarterKit.configure({
         heading: {
           levels: [1, 2, 3],
         },
       }),
-      Underline,
-      Image.configure({
+      Underline, // Not included in StarterKit, safe to add
+      ImageResize.configure({
         inline: true,
         allowBase64: true,
       }),
