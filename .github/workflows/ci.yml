@@ -34,8 +34,12 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_FRAPPE_BASE_URL: ${{ secrets.NEXT_PUBLIC_FRAPPE_BASE_URL }}
-          NEXT_PUBLIC_FRAPPE_API_KEY: ${{ secrets.NEXT_PUBLIC_FRAPPE_API_KEY }}
-          NEXT_PUBLIC_FRAPPE_API_SECRET: ${{ secrets.NEXT_PUBLIC_FRAPPE_API_SECRET }}
+          # Admin API credentials (server-side only)
+          FRAPPE_ADMIN_API_KEY: ${{ secrets.FRAPPE_ADMIN_API_KEY }}
+          FRAPPE_ADMIN_API_SECRET: ${{ secrets.FRAPPE_ADMIN_API_SECRET }}
+          # App API credentials (server-side only)
+          FRAPPE_APP_API_KEY: ${{ secrets.FRAPPE_APP_API_KEY }}
+          FRAPPE_APP_API_SECRET: ${{ secrets.FRAPPE_APP_API_SECRET }}
 
       - name: Check build output
         run: |

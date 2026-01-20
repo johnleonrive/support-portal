@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# development artifacts
+docs/
+design_reference.html
+check-ticket-html.js
+
+# editor/tool configs
+.claude/

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const FRAPPE_BASE_URL = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL || 'https://intern-dev.frappe.cloud';
-const API_KEY = process.env.NEXT_PUBLIC_FRAPPE_API_KEY;
-const API_SECRET = process.env.NEXT_PUBLIC_FRAPPE_API_SECRET;
+
+// Admin API credentials (server-side only - NOT exposed to browser)
+// Used for accessing private files with admin privileges
+const ADMIN_API_KEY = process.env.FRAPPE_ADMIN_API_KEY;
+const ADMIN_API_SECRET = process.env.FRAPPE_ADMIN_API_SECRET;
 
 export async function GET(
   request: NextRequest,
@@ -20,8 +23,8 @@ export async function GET(
     // Build headers - use admin API token for reliable file access
     const headers: Record<string, string> = {};
 
-    if (API_KEY && API_SECRET) {
-      headers['Authorization'] = `token ${API_KEY}:${API_SECRET}`;
+    if (ADMIN_API_KEY && ADMIN_API_SECRET) {
+      headers['Authorization'] = `token ${ADMIN_API_KEY}:${ADMIN_API_SECRET}`;
     } else {
       // Fallback to forwarding cookies if no API token
       const cookie = request.headers.get('cookie');

@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const FRAPPE_BASE_URL = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL || 'https://intern-dev.frappe.cloud';
-const API_KEY = process.env.NEXT_PUBLIC_FRAPPE_API_KEY;
-const API_SECRET = process.env.NEXT_PUBLIC_FRAPPE_API_SECRET;
+
+// Admin API credentials (server-side only - NOT exposed to browser)
+// Used for privileged operations like user impersonation and accessing private resources
+const ADMIN_API_KEY = process.env.FRAPPE_ADMIN_API_KEY;
+const ADMIN_API_SECRET = process.env.FRAPPE_ADMIN_API_SECRET;
+
+// App API credentials (server-side only - NOT exposed to browser)
+// Used for general app operations - falls back to admin credentials if not set
+// Currently unused but available for future separation of concerns
+const APP_API_KEY = process.env.FRAPPE_APP_API_KEY || ADMIN_API_KEY;
+const APP_API_SECRET = process.env.FRAPPE_APP_API_SECRET || ADMIN_API_SECRET;
+void APP_API_KEY; void APP_API_SECRET; // Suppress unused warnings
 
 // Debug: Log API key status (first few characters only for security)
-console.log(`[API Proxy] API_KEY: ${API_KEY ? API_KEY.substring(0, 8) + '...' : 'MISSING'}`);
-console.log(`[API Proxy] API_SECRET: ${API_SECRET ? API_SECRET.substring(0, 8) + '...' : 'MISSING'}`);
+if (process.env.NEXT_PUBLIC_API_DEBUG === 'true') {
+  console.log(`[API Proxy] ADMIN_API_KEY: ${ADMIN_API_KEY ? ADMIN_API_KEY.substring(0, 8) + '...' : 'MISSING'}`);
+  console.log(`[API Proxy] APP_API_KEY: ${APP_API_KEY ? APP_API_KEY.substring(0, 8) + '...' : 'MISSING'}`);
+}
 
 export async function GET(
   request: NextRequest,
@@ -41,8 +53,8 @@ export async function GET(
     }
 
     // Use admin tokens for reliable API access, with user-scoped filtering
-    if (API_KEY && API_SECRET) {
-      headers['Authorization'] = `token ${API_KEY}:${API_SECRET}`;
+    if (ADMIN_API_KEY && ADMIN_API_SECRET) {
+      headers['Authorization'] = `token ${ADMIN_API_KEY}:${ADMIN_API_SECRET}`;
 
       // Check for user impersonation header to ensure correct attribution
       // Skip impersonation for ticket listing to allow clinic-based filtering across users
@@ -121,8 +133,8 @@ export async function POST(
     }
 
     // Use admin tokens for reliable API access, with user-scoped filtering
-    if (API_KEY && API_SECRET) {
-      headers['Authorization'] = `token ${API_KEY}:${API_SECRET}`;
+    if (ADMIN_API_KEY && ADMIN_API_SECRET) {
+      headers['Authorization'] = `token ${ADMIN_API_KEY}:${ADMIN_API_SECRET}`;
 
       // Check for user impersonation header to ensure correct attribution
       const userEmail = request.headers.get('x-user-email');
@@ -200,8 +212,8 @@ export async function PUT(
     }
 
     // Use admin tokens for reliable API access, with user-scoped filtering
-    if (API_KEY && API_SECRET) {
-      headers['Authorization'] = `token ${API_KEY}:${API_SECRET}`;
+    if (ADMIN_API_KEY && ADMIN_API_SECRET) {
+      headers['Authorization'] = `token ${ADMIN_API_KEY}:${ADMIN_API_SECRET}`;
 
       // Check for user impersonation header to ensure correct attribution
       const userEmail = request.headers.get('x-user-email');

@@ -399,6 +399,15 @@ class FrappeAPIClient {
       }
     });
   }
+
+  // Invite system methods
+  async validateInviteToken(key: string): Promise<{ message: { valid: boolean; email?: string; first_name?: string; error?: string } }> {
+    return this.post('/method/validate_invite_token', { key });
+  }
+
+  async acceptInvite(data: { key: string; password: string; first_name: string; last_name?: string }): Promise<{ message: { success: boolean; email?: string; error?: string } }> {
+    return this.post('/method/accept_invite', data);
+  }
 }
 
 // Create and export the API client instance
