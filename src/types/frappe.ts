@@ -1,3 +1,7 @@
+// === FRAPPE TYPE DEFINITIONS ===
+// Shared TypeScript interfaces for Frappe Helpdesk doctypes (HD Ticket, HD Article, etc.)
+// and API response wrappers used across the portal.
+
 // Frappe API response wrapper
 export interface FrappeResponse<T> {
   data: T[];
@@ -12,11 +16,11 @@ export interface FrappeDoc {
   docstatus?: number;
 }
 
-// HD Ticket types
+// === HD TICKET (FR-04: Ticket Creation, FR-08: Ticket Details View) ===
 export interface HDTicket extends FrappeDoc {
   subject: string;
   description: string;
-  status: 'Open' | 'Replied' | 'Resolved' | 'Closed';
+  status: 'Open' | 'Closed';
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   ticket_type?: string;
   customer?: string;
@@ -32,7 +36,6 @@ export interface HDTicket extends FrappeDoc {
   feedback_text?: string;
   template?: string;
   custom_fields?: Record<string, unknown>;
-  clinic?: string; // Custom field: Link to Company
 }
 
 export interface CreateTicketData {
@@ -41,10 +44,9 @@ export interface CreateTicketData {
   priority?: 'Low' | 'Medium' | 'High' | 'Critical';
   ticket_type?: string;
   raised_by?: string;
-  clinic?: string; // Custom field: Link to Company
 }
 
-// HD Ticket Comment types (used for ticket conversations in Frappe Helpdesk)
+// === HD TICKET COMMENTS (FR-09: Ticket Replies) ===
 export interface HDCommunication extends FrappeDoc {
   content: string;
   commented_by: string; // User who made the comment
@@ -62,7 +64,7 @@ export interface HDCommunication extends FrappeDoc {
   reference_name?: string;
 }
 
-// HD Article types (Knowledge Base)
+// === HD ARTICLE (FR-10: Knowledge Base Browsing, FR-12: Article Detail View) ===
 export interface HDArticle extends FrappeDoc {
   title: string;
   content: string;
@@ -126,8 +128,6 @@ export interface FrappeListOptions {
 // Ticket status colors and labels
 export const TICKET_STATUS_CONFIG = {
   'Open': { color: 'blue', label: 'Open' },
-  'Replied': { color: 'yellow', label: 'Replied' },
-  'Resolved': { color: 'green', label: 'Resolved' },
   'Closed': { color: 'gray', label: 'Closed' },
 } as const;
 

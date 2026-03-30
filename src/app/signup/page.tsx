@@ -1,9 +1,10 @@
+// === SIGNUP PAGE (FR-01: User registration, NFR-04: Client-side input validation) ===
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,6 +12,9 @@ import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { SignUpData } from '@/types/frappe';
 import { SmylsLogo } from '@/components/icons/SmylsLogo';
+import { BRAND_PRIMARY, BRAND_GRADIENT, FONT_FAMILY } from '@/lib/theme';
+import { validatePassword } from '@/lib/validation';
+import { GradientButton } from '@/components/ui/gradient-button';
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -36,13 +40,9 @@ export default function SignUpPage() {
     e.preventDefault();
     setError(null);
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    const passwordError = validatePassword(formData.password, formData.confirmPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -57,7 +57,7 @@ export default function SignUpPage() {
       };
 
       await apiClient.signUp(signUpData);
-      
+
       // Assign Support Portal User role
       try {
         await apiClient.assignRole(formData.email, 'Support Portal User');
@@ -66,7 +66,7 @@ export default function SignUpPage() {
       }
 
       setSuccess(true);
-      
+
       // Redirect to login after 2 seconds
       setTimeout(() => {
         router.push('/login?message=Account created successfully. Please sign in.');
@@ -86,13 +86,13 @@ export default function SignUpPage() {
         <Card className="w-full max-w-md bg-white rounded-lg shadow-sm border-0" style={{padding: '40px 20px'}}>
           <CardContent className="p-0">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{background: 'linear-gradient(90deg, #00AEEF 0%, #2ABDAD 100%)'}}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{background: BRAND_GRADIENT}}>
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: FONT_FAMILY}}>
                 Account Created Successfully!
               </h3>
-              <p style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <p style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
                 Redirecting you to sign in...
               </p>
             </div>
@@ -111,7 +111,7 @@ export default function SignUpPage() {
           <h1 className="text-2xl font-bold text-center" style={{fontFamily: 'Helvetica Neue, -apple-system, Roboto, Helvetica, sans-serif'}}>
             <span style={{color: 'rgba(0,0,0,0.45)'}}>Join</span>
             <span style={{color: 'rgba(0,0,0,1)'}}> SMYLS</span>
-            <span style={{color: '#00AEEF'}}>.</span>
+            <span style={{color: BRAND_PRIMARY}}>.</span>
           </h1>
         </div>
 
@@ -124,7 +124,7 @@ export default function SignUpPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-4">
                 {/* Full Name Field */}
                 <div className="space-y-2">
@@ -142,7 +142,7 @@ export default function SignUpPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                   </div>
@@ -164,12 +164,12 @@ export default function SignUpPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                   </div>
                 </div>
-                
+
                 {/* Password Field */}
                 <div className="space-y-2">
                   <div className="relative">
@@ -187,7 +187,7 @@ export default function SignUpPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                     <button
@@ -222,7 +222,7 @@ export default function SignUpPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                     <button
@@ -240,15 +240,14 @@ export default function SignUpPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Create Account Button */}
-              <Button 
-                type="submit" 
-                className="w-full h-12 rounded-xl font-semibold text-white border-0"
+              <GradientButton
+                type="submit"
+                className="w-full h-12 rounded-xl font-semibold"
                 style={{
-                  background: '#00AEEF',
                   fontSize: '12px',
-                  fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                  fontFamily: FONT_FAMILY
                 }}
                 disabled={isLoading}
               >
@@ -260,16 +259,16 @@ export default function SignUpPage() {
                 ) : (
                   'Create Account'
                 )}
-              </Button>
+              </GradientButton>
             </form>
-            
+
             <div className="mt-6 text-center">
-              <p className="text-sm" style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <p className="text-sm" style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
                 Already have an account?{' '}
-                <Link 
-                  href="/login" 
+                <Link
+                  href="/login"
                   className="font-medium hover:underline"
-                  style={{color: '#00AEEF'}}
+                  style={{color: BRAND_PRIMARY}}
                 >
                   Sign in
                 </Link>

@@ -1,15 +1,21 @@
+// === INVITE ACCEPTANCE (FR-03: Tokenized email invite link activation) ===
+// Validates invite token, then lets the user set a password and activate their account.
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { SmylsLogo } from '@/components/icons/SmylsLogo';
+import { BRAND_PRIMARY, BRAND_GRADIENT, FONT_FAMILY } from '@/lib/theme';
+import { validatePassword } from '@/lib/validation';
+import { GradientButton } from '@/components/ui/gradient-button';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 function AcceptInviteContent() {
   const [formData, setFormData] = useState({
@@ -50,7 +56,7 @@ function AcceptInviteContent() {
             setFormData(prev => ({ ...prev, firstName: response.message.first_name || '' }));
           }
         } else {
-          setTokenError(response.message.error || 'Invalid or expired token');
+          setTokenError(('error' in response.message ? response.message.error : undefined) || 'Invalid or expired token');
         }
       } catch (err) {
         console.error('Token validation error:', err);
@@ -78,13 +84,9 @@ function AcceptInviteContent() {
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    const passwordError = validatePassword(formData.password, formData.confirmPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -110,7 +112,7 @@ function AcceptInviteContent() {
           router.push('/login?message=Account activated successfully. Please sign in.');
         }, 2000);
       } else {
-        setError(response.message.error || 'Failed to activate account');
+        setError(('error' in response.message ? response.message.error : undefined) || 'Failed to activate account');
       }
     } catch (err) {
       console.error('Accept invite error:', err);
@@ -128,10 +130,7 @@ function AcceptInviteContent() {
         <Card className="w-full max-w-md bg-white rounded-lg shadow-sm border-0" style={{padding: '40px 20px'}}>
           <CardContent className="p-0">
             <div className="text-center space-y-4">
-              <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{color: '#00AEEF'}} />
-              <p style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
-                Validating your invitation...
-              </p>
+              <LoadingSpinner message="Validating your invitation..." />
             </div>
           </CardContent>
         </Card>
@@ -149,24 +148,23 @@ function AcceptInviteContent() {
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto bg-red-100">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: FONT_FAMILY}}>
                 Invalid Invitation
               </h3>
-              <p style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <p style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
                 {tokenError}
               </p>
               <div className="pt-4">
                 <Link href="/login">
-                  <Button
-                    className="w-full h-12 rounded-xl font-semibold text-white border-0"
+                  <GradientButton
+                    className="w-full h-12 rounded-xl font-semibold"
                     style={{
-                      background: '#00AEEF',
                       fontSize: '12px',
-                      fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                      fontFamily: FONT_FAMILY
                     }}
                   >
                     Go to Sign In
-                  </Button>
+                  </GradientButton>
                 </Link>
               </div>
             </div>
@@ -183,13 +181,13 @@ function AcceptInviteContent() {
         <Card className="w-full max-w-md bg-white rounded-lg shadow-sm border-0" style={{padding: '40px 20px'}}>
           <CardContent className="p-0">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{background: 'linear-gradient(90deg, #00AEEF 0%, #2ABDAD 100%)'}}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{background: BRAND_GRADIENT}}>
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <h3 className="text-lg font-semibold" style={{color: '#000', fontFamily: FONT_FAMILY}}>
                 Account Activated!
               </h3>
-              <p style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <p style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
                 Redirecting you to sign in...
               </p>
             </div>
@@ -209,10 +207,10 @@ function AcceptInviteContent() {
           <h1 className="text-2xl font-bold text-center" style={{fontFamily: 'Helvetica Neue, -apple-system, Roboto, Helvetica, sans-serif'}}>
             <span style={{color: 'rgba(0,0,0,0.45)'}}>Welcome to</span>
             <span style={{color: 'rgba(0,0,0,1)'}}> SMYLS</span>
-            <span style={{color: '#00AEEF'}}>.</span>
+            <span style={{color: BRAND_PRIMARY}}>.</span>
           </h1>
           {userEmail && (
-            <p className="text-sm" style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+            <p className="text-sm" style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
               Setting up account for <strong>{userEmail}</strong>
             </p>
           )}
@@ -245,7 +243,7 @@ function AcceptInviteContent() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                   </div>
@@ -266,7 +264,7 @@ function AcceptInviteContent() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                   </div>
@@ -289,7 +287,7 @@ function AcceptInviteContent() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                     <button
@@ -324,7 +322,7 @@ function AcceptInviteContent() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                     <button
@@ -344,13 +342,12 @@ function AcceptInviteContent() {
               </div>
 
               {/* Activate Account Button */}
-              <Button
+              <GradientButton
                 type="submit"
-                className="w-full h-12 rounded-xl font-semibold text-white border-0"
+                className="w-full h-12 rounded-xl font-semibold"
                 style={{
-                  background: '#00AEEF',
                   fontSize: '12px',
-                  fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                  fontFamily: FONT_FAMILY
                 }}
                 disabled={isLoading}
               >
@@ -362,16 +359,16 @@ function AcceptInviteContent() {
                 ) : (
                   'Activate Account'
                 )}
-              </Button>
+              </GradientButton>
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm" style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
+              <p className="text-sm" style={{color: '#6B7280', fontFamily: FONT_FAMILY}}>
                 Already have an account?{' '}
                 <Link
                   href="/login"
                   className="font-medium hover:underline"
-                  style={{color: '#00AEEF'}}
+                  style={{color: BRAND_PRIMARY}}
                 >
                   Sign in
                 </Link>
@@ -388,7 +385,7 @@ export default function AcceptInvitePage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center px-4" style={{background: '#F3F4F6'}}>
-        <Loader2 className="w-12 h-12 animate-spin" style={{color: '#00AEEF'}} />
+        <LoadingSpinner message="Loading..." />
       </div>
     }>
       <AcceptInviteContent />

@@ -1,7 +1,11 @@
+// === AUTH STATE MANAGEMENT (FR-02: Email/password login, FR-15: Secure logout) ===
+// Zustand store with localStorage persistence handles login, logout, and session validation.
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AuthStore, LoginCredentials, FrappeUser } from '@/types/auth';
 import { apiClient } from '@/lib/api';
+import { isDemoMode, DEMO_USER } from '@/lib/demo-data';
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -12,10 +16,28 @@ export const useAuthStore = create<AuthStore>()(
       hasHydrated: false,
       error: null,
 
+      // === LOGIN (FR-02: Email/password login via Frappe API) ===
       login: async (credentials: LoginCredentials) => {
         set({ isLoading: true, error: null });
 
         try {
+          // Demo mode: skip real API, use demo user directly
+          if (isDemoMode()) {
+            await new Promise((r) => setTimeout(r, 400)); // Simulate network delay
+            const user: FrappeUser = {
+              name: DEMO_USER.name,
+              email: DEMO_USER.email,
+              full_name: DEMO_USER.full_name,
+              first_name: DEMO_USER.first_name,
+              last_name: DEMO_USER.last_name,
+              roles: DEMO_USER.roles,
+              enabled: 1,
+              user_type: DEMO_USER.user_type,
+            };
+            set({ user, isAuthenticated: true, isLoading: false, error: null });
+            return;
+          }
+
           const response = await apiClient.login(credentials.usr, credentials.pwd);
           const authData = response as { full_name?: string; first_name?: string; last_name?: string; message?: { full_name?: string; first_name?: string; last_name?: string } };
 
@@ -40,30 +62,16 @@ export const useAuthStore = create<AuthStore>()(
             console.warn('Could not fetch user details during login:', fetchError);
           }
 
-          // Fetch clinic from Contact's linked Company (not User.clinic)
-          // This is the reliable way to get clinic based on Contact → Company linking
-          let clinic: string | undefined;
-          try {
-            clinic = await apiClient.getCompanyFromContact(credentials.usr);
-            console.log('Login - fetched clinic from Contact links:', clinic);
-          } catch (fetchError) {
-            console.warn('Could not fetch clinic from Contact during login:', fetchError);
-          }
-
-          // Create user object from login response + fetched clinic from Contact
           const user: FrappeUser = {
             name: credentials.usr,
             email: credentials.usr,
             full_name: fullName,
             first_name: firstName,
             last_name: lastName,
-            roles: [], // We'll populate this later if needed
+            roles: [],
             enabled: 1,
             user_type: 'System User',
-            clinic: clinic,
           };
-
-          console.log('Login - user object:', user);
 
           set({
             user,
@@ -83,6 +91,7 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
+      // === LOGOUT (FR-15: Secure logout with session invalidation) ===
       logout: async () => {
         set({ isLoading: true });
         
@@ -104,7 +113,14 @@ export const useAuthStore = create<AuthStore>()(
         set({ error: null });
       },
 
+      // === SESSION VALIDATION (FR-02: Verify active session on page reload) ===
       checkSession: async () => {
+        // Demo mode: trust persisted state, no API validation needed
+        if (isDemoMode()) {
+          set({ isLoading: false });
+          return true;
+        }
+
         // Get the current persisted user before making API calls
         const currentUser = useAuthStore.getState().user;
 
@@ -157,29 +173,16 @@ export const useAuthStore = create<AuthStore>()(
             // Log the response to debug
             console.log('User details response:', userDocData);
 
-            // Fetch clinic from Contact's linked Company (not User.clinic)
-            // This is the reliable way to get clinic based on Contact → Company linking
-            let clinic: string | undefined;
-            try {
-              clinic = await apiClient.getCompanyFromContact(sessionEmail);
-              console.log('Session check - fetched clinic from Contact links:', clinic);
-            } catch (fetchError) {
-              console.warn('Could not fetch clinic from Contact during session check:', fetchError);
-            }
-
             const user: FrappeUser = {
               name: userDocData.message?.name || sessionEmail,
               email: sessionEmail,
               full_name: userDocData.message?.full_name || userDocData.message?.name || sessionEmail,
               first_name: userDocData.message?.first_name || '',
               last_name: userDocData.message?.last_name || '',
-              roles: [], // Roles are in a child table, we'll fetch separately if needed
+              roles: [],
               enabled: userDocData.message?.enabled || 1,
               user_type: userDocData.message?.user_type || 'System User',
-              clinic: clinic,
             };
-
-            console.log('User object with clinic:', user);
 
             set({
               user,
@@ -193,14 +196,6 @@ export const useAuthStore = create<AuthStore>()(
             // If we can't fetch user details, use just the email
             console.warn('Could not fetch user details, using email only:', userFetchError);
 
-            // Still try to get clinic from Contact
-            let clinic: string | undefined;
-            try {
-              clinic = await apiClient.getCompanyFromContact(sessionEmail);
-            } catch {
-              // Ignore error
-            }
-
             const user: FrappeUser = {
               name: sessionEmail,
               email: sessionEmail,
@@ -210,7 +205,6 @@ export const useAuthStore = create<AuthStore>()(
               roles: [],
               enabled: 1,
               user_type: 'System User',
-              clinic: clinic,
             };
 
             set({

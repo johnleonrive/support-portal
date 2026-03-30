@@ -1,3 +1,5 @@
+// === AUTH TYPES (FR-02: User Authentication) ===
+
 export interface FrappeAuthConfig {
   baseUrl: string;
   apiVersion?: string;
@@ -13,7 +15,6 @@ export interface FrappeUser {
   roles: string[];
   enabled?: number;
   user_type?: string;
-  clinic?: string; // Custom field: Link to Company
 }
 
 export interface FrappeAuthResponse {

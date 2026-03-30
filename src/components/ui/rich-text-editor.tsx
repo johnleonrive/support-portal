@@ -1,7 +1,11 @@
+// === RICH TEXT EDITOR (FR-14: Rich text formatting for ticket descriptions and replies) ===
+// TipTap-based editor with bold, italic, headings, lists, images, links, and more.
+
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
 import ImageResize from 'tiptap-extension-resize-image';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -58,9 +62,12 @@ export function RichTextEditor({
         },
       }),
       Underline, // Not included in StarterKit, safe to add
-      ImageResize.configure({
+      Image.configure({
         inline: true,
         allowBase64: true,
+      }),
+      ImageResize.configure({
+        inline: true,
       }),
       Link.configure({
         openOnClick: false,

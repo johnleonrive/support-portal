@@ -1,3 +1,7 @@
+// === FRAPPE API CLIENT (NFR-10: RESTful API Integration with Frappe Helpdesk) ===
+// All backend communication flows through this client → Next.js proxy → Frappe Cloud.
+// Backend permission_query() handles data isolation (FR-13) automatically per user session.
+
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { FrappeAuthConfig, FrappeErrorResponse } from '@/types/auth';
 
@@ -20,25 +24,11 @@ class FrappeAPIClient {
     this.setupInterceptors();
   }
 
+  // === REQUEST/RESPONSE INTERCEPTORS (NFR-07: User-friendly error messages) ===
   private setupInterceptors() {
-    // Request interceptor for session-based authentication
+    // Request interceptor — ensure cookies are sent for session auth
     this.client.interceptors.request.use((config) => {
-      config.withCredentials = true; // Ensure cookies are sent with requests
-      
-      // Get current user email for proper attribution (from auth store)
-      if (typeof window !== 'undefined') {
-        const authStore = JSON.parse(localStorage.getItem('auth-store') || '{}');
-        const userEmail = authStore?.state?.user?.email;
-        if (userEmail) {
-          config.headers = config.headers || {};
-          config.headers['X-User-Email'] = userEmail;
-        }
-      }
-      
-      if (process.env.NEXT_PUBLIC_API_DEBUG === 'true') {
-        console.log('API Request (with user context):', config);
-      }
-      
+      config.withCredentials = true;
       return config;
     });
 
@@ -145,7 +135,7 @@ class FrappeAPIClient {
     return this.request<T>({ ...config, method: 'DELETE', url });
   }
 
-  // Login method for session-based auth
+  // === AUTHENTICATION (FR-02: Email/password login, FR-15: Secure logout) ===
   async login(usr: string, pwd: string) {
     return this.post('/method/login', { usr, pwd });
   }
@@ -165,65 +155,11 @@ class FrappeAPIClient {
     return this.post('/method/frappe.client.get_value', {
       doctype: 'User',
       filters: { name: email },
-      fieldname: ['name', 'full_name', 'first_name', 'last_name', 'email', 'enabled', 'user_type', 'clinic']
+      fieldname: ['name', 'full_name', 'first_name', 'last_name', 'email', 'enabled', 'user_type']
     });
   }
 
-  // Get Contact document by user email (to find linked Company)
-  async getContactByUser(userEmail: string) {
-    try {
-      // Search for Contact where user field matches the email
-      const response = await this.get<{ data: Array<{ name: string }> }>('/resource/Contact', {
-        params: {
-          filters: JSON.stringify({ user: userEmail }),
-          fields: JSON.stringify(['name']),
-          limit_page_length: 1
-        }
-      });
-
-      if (response.data && response.data.length > 0) {
-        // Get the full Contact document with links
-        const contactName = response.data[0].name;
-        return this.get(`/resource/Contact/${encodeURIComponent(contactName)}`);
-      }
-
-      return null;
-    } catch (error) {
-      console.warn('Could not fetch Contact for user:', userEmail, error);
-      return null;
-    }
-  }
-
-  // Get Company from Contact's links
-  async getCompanyFromContact(userEmail: string): Promise<string | undefined> {
-    try {
-      const contactResponse = await this.getContactByUser(userEmail);
-
-      if (!contactResponse) {
-        console.log('No Contact found for user:', userEmail);
-        return undefined;
-      }
-
-      const contactData = contactResponse as { data?: { links?: Array<{ link_doctype: string; link_name: string }> } };
-      const links = contactData.data?.links || [];
-
-      // Find the Company link in the links array
-      const companyLink = links.find(link => link.link_doctype === 'Company');
-
-      if (companyLink) {
-        console.log('Found Company from Contact links:', companyLink.link_name);
-        return companyLink.link_name;
-      }
-
-      console.log('No Company link found in Contact:', contactData.data);
-      return undefined;
-    } catch (error) {
-      console.warn('Error getting Company from Contact:', error);
-      return undefined;
-    }
-  }
-
-  // Frappe-specific methods for support portal
+  // === USER MANAGEMENT (FR-01: Registration, FR-03: Invite system) ===
   
   // User signup
   async signUp(userData: { email: string; full_name: string; password: string }) {
@@ -239,27 +175,19 @@ class FrappeAPIClient {
     });
   }
 
-  // Tickets
-  // When fetching tickets for clinic-based filtering, we need to skip user impersonation
-  // to get ALL tickets (admin-level access) and then filter client-side by clinic
-  async getTickets(filters?: Record<string, unknown>, skipImpersonation = false) {
+  // === TICKETS (FR-04: Creation, FR-05: Dashboard listing, FR-07: Search) ===
+  // Backend permission_query() automatically filters by HD Customer (FR-13)
+  async getTickets(filters?: Record<string, unknown>) {
     const params: Record<string, string> = {};
     if (filters) {
       params.filters = JSON.stringify(filters);
     }
-    // Request specific fields for the list view (including clinic for filtering)
     params.fields = JSON.stringify([
       'name', 'subject', 'description', 'status', 'priority',
-      'raised_by', 'creation', 'modified', 'owner', 'ticket_type', 'clinic'
+      'raised_by', 'creation', 'modified', 'owner', 'ticket_type'
     ]);
 
-    // Create headers with optional skip impersonation
-    const headers: Record<string, string> = {};
-    if (skipImpersonation) {
-      headers['X-Skip-Impersonation'] = 'true';
-    }
-
-    return this.get(`/resource/HD Ticket`, { params, headers });
+    return this.get(`/resource/HD Ticket`, { params });
   }
 
   async getTicket(ticketId: string) {
@@ -274,9 +202,8 @@ class FrappeAPIClient {
     return this.put(`/resource/HD Ticket/${ticketId}`, ticketData);
   }
 
-  // Ticket Replies/Comments (using HD Ticket Comment doctype from Frappe Helpdesk)
-  // skipImpersonation allows clinic users to see all comments on shared tickets
-  async getTicketReplies(ticketId: string, skipImpersonation = false) {
+  // === TICKET REPLIES (FR-09: Reply to open tickets with conversation thread) ===
+  async getTicketReplies(ticketId: string) {
     const params = {
       filters: JSON.stringify({
         reference_ticket: ticketId
@@ -288,12 +215,7 @@ class FrappeAPIClient {
       order_by: 'creation asc'
     };
 
-    const headers: Record<string, string> = {};
-    if (skipImpersonation) {
-      headers['X-Skip-Impersonation'] = 'true';
-    }
-
-    return this.get(`/resource/HD Ticket Comment`, { params, headers });
+    return this.get(`/resource/HD Ticket Comment`, { params });
   }
 
   async addTicketReply(ticketId: string, content: string, sender?: string) {
@@ -304,7 +226,7 @@ class FrappeAPIClient {
     });
   }
 
-  // Knowledge Base Articles
+  // === KNOWLEDGE BASE (FR-10: Browse articles, FR-11: Search, FR-12: Detail view) ===
   async getArticles() {
     try {
       console.log('🔍 Attempting to load HD Articles from API...');
@@ -345,32 +267,18 @@ class FrappeAPIClient {
     return this.get(`/resource/HD Article/${articleId}`);
   }
 
-  // Search
-  async searchTickets(query: string, clinic?: string, skipImpersonation = false) {
-    const filters: Record<string, unknown> = {
-      subject: ['like', `%${query}%`]
-    };
-
-    // Filter by clinic if provided (shows all tickets from the same clinic)
-    if (clinic) {
-      filters.clinic = clinic;
-    }
-
-    // Create headers with optional skip impersonation
-    const headers: Record<string, string> = {};
-    if (skipImpersonation) {
-      headers['X-Skip-Impersonation'] = 'true';
-    }
-
+  // === TICKET SEARCH (FR-07: Find tickets by keywords) ===
+  async searchTickets(query: string) {
     return this.get('/resource/HD Ticket', {
       params: {
-        filters: JSON.stringify(filters),
+        filters: JSON.stringify({
+          subject: ['like', `%${query}%`]
+        }),
         fields: JSON.stringify([
           'name', 'subject', 'description', 'status', 'priority',
-          'raised_by', 'creation', 'modified', 'owner', 'ticket_type', 'clinic'
+          'raised_by', 'creation', 'modified', 'owner', 'ticket_type'
         ])
-      },
-      headers
+      }
     });
   }
 
@@ -400,7 +308,14 @@ class FrappeAPIClient {
     });
   }
 
-  // Invite system methods
+  // === PASSWORD RESET (FR-16: Forgot password via email) ===
+  async resetPassword(email: string) {
+    return this.post('/method/frappe.core.doctype.user.user.reset_password', {
+      user: email
+    });
+  }
+
+  // === INVITE SYSTEM (FR-03: Tokenized email invite links) ===
   async validateInviteToken(key: string): Promise<{ message: { valid: boolean; email?: string; first_name?: string; error?: string } }> {
     return this.post('/method/validate_invite_token', { key });
   }
@@ -411,7 +326,15 @@ class FrappeAPIClient {
 }
 
 // Create and export the API client instance
-export const createAPIClient = (): FrappeAPIClient => {
+// In demo mode (NEXT_PUBLIC_DEMO_MODE=true), uses a mock client with dummy data
+import { DemoAPIClient } from './demo-api';
+import { isDemoMode } from './demo-data';
+
+export const createAPIClient = (): FrappeAPIClient | DemoAPIClient => {
+  if (isDemoMode()) {
+    return new DemoAPIClient();
+  }
+
   const config: FrappeAuthConfig = {
     baseUrl: process.env.NEXT_PUBLIC_FRAPPE_BASE_URL || '',
     apiVersion: process.env.NEXT_PUBLIC_FRAPPE_API_VERSION || 'v2',

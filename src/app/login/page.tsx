@@ -1,15 +1,18 @@
+// === LOGIN PAGE (FR-02: Email/password login via Frappe authentication) ===
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SmylsLogo } from '@/components/icons/SmylsLogo';
+import { BRAND_PRIMARY, FONT_FAMILY } from '@/lib/theme';
+import { GradientButton } from '@/components/ui/gradient-button';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,7 +24,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    
+
     try {
       await login({ usr: email, pwd: password });
       router.push('/dashboard');
@@ -41,7 +44,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-center" style={{fontFamily: 'Helvetica Neue, -apple-system, Roboto, Helvetica, sans-serif'}}>
             <span style={{color: 'rgba(0,0,0,0.45)'}}>Login to</span>
             <span style={{color: 'rgba(0,0,0,1)'}}> SMYLS Support</span>
-            <span style={{color: '#00AEEF'}}>.</span>
+            <span style={{color: BRAND_PRIMARY}}>.</span>
           </h1>
         </div>
 
@@ -54,7 +57,7 @@ export default function LoginPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-4">
                 {/* Email Field */}
                 <div className="space-y-2">
@@ -71,12 +74,12 @@ export default function LoginPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                   </div>
                 </div>
-                
+
                 {/* Password Field */}
                 <div className="space-y-2">
                   <div className="relative">
@@ -92,7 +95,7 @@ export default function LoginPage() {
                       style={{
                         borderColor: '#C5C6CC',
                         fontSize: '14px',
-                        fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                        fontFamily: FONT_FAMILY
                       }}
                     />
                     <button
@@ -108,28 +111,27 @@ export default function LoginPage() {
                       )}
                     </button>
                   </div>
-                  
+
                   {/* Forgot Password Link */}
                   <div className="text-right">
-                    <Link 
+                    <Link
                       href="/forgot-password"
                       className="text-xs font-semibold hover:underline"
-                      style={{color: '#006FFD', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}
+                      style={{color: '#006FFD', fontFamily: FONT_FAMILY}}
                     >
                       Forgot password?
                     </Link>
                   </div>
                 </div>
               </div>
-              
+
               {/* Login Button */}
-              <Button 
-                type="submit" 
-                className="w-full h-12 rounded-xl font-semibold text-white border-0"
+              <GradientButton
+                type="submit"
+                className="w-full h-12 rounded-xl font-semibold"
                 style={{
-                  background: '#00AEEF',
                   fontSize: '12px',
-                  fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'
+                  fontFamily: FONT_FAMILY
                 }}
                 disabled={isLoading}
               >
@@ -141,21 +143,10 @@ export default function LoginPage() {
                 ) : (
                   'Login'
                 )}
-              </Button>
+              </GradientButton>
             </form>
-            
-            <div className="mt-6 text-center">
-              <p className="text-sm" style={{color: '#6B7280', fontFamily: 'Inter, -apple-system, Roboto, Helvetica, sans-serif'}}>
-                Don&apos;t have an account?{' '}
-                <Link 
-                  href="/signup" 
-                  className="font-medium hover:underline"
-                  style={{color: '#00AEEF'}}
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
+
+            {/* Signup hidden — users are onboarded via invite only */}
           </CardContent>
         </Card>
       </div>
